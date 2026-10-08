@@ -344,10 +344,10 @@ export default function reducer(_state, action) {
       }
       break;
     case Types.TIMELINE_PUSH_SELECTION: {
-      if (!state.zoom || !action.start || !action.end || action.start < state.zoom.start || action.end > state.zoom.end) {
-        state.files = null;
-      }
-
+      const routeChanged = state.selectedRouteId !== action.log_id;
+      if (routeChanged) state.files = null;
+      const previous = routeChanged ? null : (state.zoom?.previous?.start === action.start && state.zoom?.previous?.end === action.end
+        ? state.zoom.previous.previous : state.zoom);
       state.selectedRouteId = action.log_id;
       state.currentRoute = state.routes?.find((route) => route.log_id === action.log_id) || null;
       if (action.log_id) {
@@ -355,13 +355,13 @@ export default function reducer(_state, action) {
           state.zoom = {
             start: action.start,
             end: action.end,
-            previous: state.zoom,
+            previous,
           };
         } else {
           state.zoom = state.currentRoute ? {
             start: 0,
             end: state.currentRoute.duration,
-            previous: state.zoom,
+            previous,
           } : null;
           state.loop = null;
         }
