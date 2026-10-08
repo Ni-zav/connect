@@ -1,33 +1,16 @@
 import store from '../store';
+import { readVideoClock } from './clock';
 
-/**
- * Get current playback offset
- *
- * @param {object} state
- * @returns {number}
- */
 export function currentOffset(state = null) {
-  if (!state) {
-    state = store.getState();
-  }
-
-  /** @type {number} */
-  let offset;
-  if (state.offset === null && state.loop?.startTime) {
-    offset = state.loop.startTime;
-  } else {
-    const playSpeed = state.isBufferingVideo ? 0 : state.desiredPlaySpeed;
-    offset = state.offset + ((Date.now() - state.startTime) * playSpeed);
-  }
-
-  if (offset !== null && state.loop?.startTime) {
-    // respect the loop
-    const loopOffset = state.loop.startTime;
-    if (offset < loopOffset) {
-      offset = loopOffset;
-    } else if (offset > loopOffset + state.loop.duration) {
-      offset = ((offset - loopOffset) % state.loop.duration) + loopOffset;
-    }
+  state ||= store.getState();
+  const videoOffset = readVideoClock(state);
+  const speed = state.isBufferingVideo ? 0 : state.desiredPlaySpeed;
+  let offset = videoOffset ?? ((state.offset ?? state.loop?.startTime ?? 0) + (Date.now() - state.startTime) * speed);
+  const loop = state.loop;
+  if (loop && loop.startTime != null && loop.duration > 0) {
+    const end = loop.startTime + loop.duration;
+    if (offset < loop.startTime) offset = loop.startTime;
+    if (offset > end) offset = videoOffset != null ? end : (offset - loop.startTime) % loop.duration + loop.startTime;
   }
   return offset;
 }
