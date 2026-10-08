@@ -30,3 +30,21 @@ There's a ton of them, but these are worth mentioning because they sort of affec
  * `Redux` - Sane formal *global* scope. This is not a replacement for component state, which is the best way to store local component level variables and trigger re-renders. Redux state is for global state that many unrelated components care about. No free-form editing, only specific pre-defined actions. [Redux DevTools](https://chrome.google.com/webstore/detail/redux-devtools/lmhkpmbekcpmknklioeibfkpmmfibljd?hl=en) can be very helpful.
  * `@material-ui` - Lots of fully featured highly customizable components for building the UIs with. Theming system with global and per-component overrides of any CSS values.
  * `connected-react-router` - Mindlessly simple routing with convenient global access due to redux
+
+## Navigation
+
+`src/url.js` defines the URL grammar and builders. The history middleware applies
+all location changes (PUSH, POP, REPLACE) to state; navigation actions write URLs.
+Route metadata is retained when navigating within the same device, and query-only
+changes leave drive selection and playback untouched.
+
+- Dashboard: `/<dongle>`; drive: `/<dongle>/<route>[/<start>/<end>]` (seconds).
+- Prime and livestream: `/<dongle>/prime`, `/<dongle>/stream`; referrals: `/referrals`.
+- Overlay on any page: `?modal=pair`, `?modal=filter`, or `?modal=uploads`.
+- Device settings: `?modal=settings&device=<dongle>`; append `&dialog=uploads`
+  or `&dialog=unpair` for its nested dialogs. These URLs display dialogs only;
+  they never submit pairing, sharing, billing or unpairing operations.
+
+Legacy timestamp links are replaced with route links after lookup, preserving
+query arguments. Results from superseded navigations are ignored. URL parsing,
+history reconciliation, and bookmarked dialogs are covered by `bun run test`.

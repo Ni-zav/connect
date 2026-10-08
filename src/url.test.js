@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getDongleID, getZoom, getRouteId, getRouteZoom, getPrimeNav, getStreamNav } from './url';
+import { getDongleID, getZoom, getRouteId, getRouteZoom, getPrimeNav, getStreamNav, parseLocation, overlayLocation, drivePath } from './url';
 
 const DONGLE = '0000aaaa0000aaaa';
 const LOG = '2026-08-06--12-00-00';
@@ -15,18 +15,10 @@ describe('URL pathname helpers', () => {
     expect(getDongleID(pathname)).toBe(expected);
   });
 
-  it('returns null if a pathname segment disappears while it is read', () => {
-    let reads = 0;
-    const parts = [];
-    Object.defineProperty(parts, 0, { get: () => ((reads += 1) === 1 ? DONGLE : '') });
-    const pathname = { split: () => ({ filter: () => parts }) };
-    expect(getDongleID(pathname)).toBeNull();
-  });
-
   it.each([
     [`/${DONGLE}/10/20`, { start: 10, end: 20 }],
-    [`/${DONGLE}/0/20/ignored`, { start: 0, end: 20 }],
-    [`/${DONGLE}/${LOG}/10/20`, { start: Number(LOG), end: 10 }],
+    [`/${DONGLE}/0/20/ignored`, null],
+    [`/${DONGLE}/${LOG}/10/20`, null],
     [`/${DONGLE}/10`, null],
     ['/auth/code/provider', null],
   ])('getZoom(%s)', (pathname, expected) => {
@@ -67,5 +59,25 @@ describe('URL pathname helpers', () => {
     [`/${DONGLE}/prime`, false],
   ])('getStreamNav(%s)', (pathname, expected) => {
     expect(getStreamNav(pathname)).toBe(expected);
+  });
+});
+
+describe('location grammar', () => {
+  it.each(['/'+DONGLE+'junk', '/prefix'+DONGLE, '/not-a-device/'+LOG, '/'+DONGLE+'/'+LOG+'/20/10', '/'+DONGLE+'/'+LOG+'/NaN/20'])('rejects malformed paths: %s', (pathname) => {
+    expect(parseLocation({ pathname }).page).toBe('invalid');
+    expect(getRouteId(pathname)).toBeNull();
+  });
+  it('round trips zero-start and fractional route ranges without truncation', () => {
+    const zoom = { start: 0, end: 1234 };
+    expect(parseLocation({ pathname: drivePath(DONGLE, LOG, zoom) }).zoom).toEqual(zoom);
+  });
+  it('parses current hexadecimal route IDs', () => {
+    expect(getRouteId('/'+DONGLE+'/0000010a--a51155e496')).toBe('0000010a--a51155e496');
+  });
+  it('preserves page, share arguments and hash while opening and closing settings', () => {
+    const location = { pathname: '/'+DONGLE+'/'+LOG, search: '?sig=share', hash: '#timeline' };
+    const opened = overlayLocation(location, 'settings', DONGLE, 'uploads');
+    expect(parseLocation(opened)).toMatchObject({ page: 'drive', modal: 'settings', settingsDongleId: DONGLE, dialog: 'uploads' });
+    expect(overlayLocation(opened, null)).toEqual(location);
   });
 });

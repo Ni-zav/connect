@@ -13,8 +13,13 @@ import Dashboard from './Dashboard';
 import IosPwaPopup from './IosPwaPopup';
 import AppDrawer from './AppDrawer';
 import BodyTeleop from './BodyTeleop';
+import AddDevice from './Dashboard/AddDevice';
+import TimeSelect from './TimeSelect';
+import UploadQueue from './Files/UploadQueue';
+import DeviceSettingsModal from './Dashboard/DeviceSettingsModal';
+import { parseLocation } from '../url';
 
-import { analyticsEvent, selectDevice, updateDevices, checkLastRoutesData, streamNav } from '../actions';
+import { analyticsEvent, selectDevice, updateDevices, checkLastRoutesData, streamNav, navigateOverlay } from '../actions';
 import init from '../actions/startup';
 import Colors from '../colors';
 import { play, pause } from '../timeline/playback';
@@ -198,10 +203,11 @@ class ExplorerApp extends Component {
 
   render() {
     const {
-      classes, currentRoute, devices, dispatch, dongleId, bodyTeleopOpen, selectedRouteId, pathname, profile,
+      classes, currentRoute, devices, dispatch, dongleId, bodyTeleopOpen, selectedRouteId, pathname, profile, location,
     } = this.props;
     const { drawerIsOpen, pairLoading, pairError, pairDongleId, windowWidth } = this.state;
 
+    const path = parseLocation(location);
     const noDevicesUpsell = (devices?.length === 0 && !dongleId);
     const referralsOpen = pathname === '/referrals';
     const isLarge = noDevicesUpsell || windowWidth > 1080;
@@ -224,6 +230,14 @@ class ExplorerApp extends Component {
 
     return (
       <div className={classes.app}>
+        <AddDevice modalOnly />
+        {path.modal === 'filter' && <TimeSelect onClose={() => dispatch(navigateOverlay(null))} />}
+        {this.props.device && <UploadQueue open={path.modal === 'uploads'} update={path.modal === 'uploads'} device={this.props.device} onClose={() => dispatch(navigateOverlay(null))} />}
+        <DeviceSettingsModal
+          isOpen={path.modal === 'settings'}
+          dongleId={path.settingsDongleId}
+          onClose={() => dispatch(navigateOverlay(null))}
+        />
         { bodyTeleopOpen ? (
           <BodyTeleop onClose={ this.closeBodyTeleop } />
         ) : (
@@ -247,6 +261,7 @@ class ExplorerApp extends Component {
                 ? <Referrals profile={profile} onBack={() => dispatch(push(dongleId ? `/${dongleId}` : '/'))} />
                 : noDevicesUpsell
                 ? <NoDeviceUpsell />
+                : path.page === 'invalid' ? <Typography className="p-8">Page not found.</Typography>
                 : ((currentRoute || selectedRouteId) ? <DriveView /> : <Dashboard />)}
             </div>
             <IosPwaPopup />
@@ -278,8 +293,10 @@ class ExplorerApp extends Component {
 const stateToProps = (state) => ({
   zoom: state.zoom,
   pathname: state.router.location.pathname,
+  location: state.router.location,
   dongleId: state.dongleId,
   devices: state.devices,
+  device: state.device,
   currentRoute: state.currentRoute,
   selectedRouteId: state.selectedRouteId,
   limit: state.limit,

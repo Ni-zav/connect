@@ -289,6 +289,41 @@ describe('whole-app behavior', () => {
     await waitFor(() => expect(history.location.pathname).toBe(`/${SECOND}`));
   });
 
+  test('plain PUSH navigation loads a route and reuses it while opening settings', async () => {
+    const { history, store } = await renderApp(`/${FIRST}`);
+    act(() => history.push(`/${FIRST}/${LOG}/0/20`));
+    expect(await screen.findByRole('slider', { name: 'Drive timeline' })).toBeVisible();
+    await waitFor(() => expect(store.getState().currentRoute?.log_id).toBe(LOG));
+    const state = store.getState();
+    const routeRequests = mocks.requests.filter(({ url }) => url.includes('routes_segments')).length;
+    act(() => history.push(`/${FIRST}/${LOG}/0/20?modal=settings&device=${SECOND}`));
+    expect(await screen.findByText('Device settings')).toBeVisible();
+    expect(store.getState().currentRoute).toBe(state.currentRoute);
+    expect(store.getState().zoom).toBe(state.zoom);
+    expect(store.getState().loop).toBe(state.loop);
+    expect(mocks.requests.filter(({ url }) => url.includes('routes_segments'))).toHaveLength(routeRequests);
+    act(() => history.goBack());
+    await waitFor(() => expect(screen.queryByText('Device settings')).not.toBeInTheDocument());
+    expect(store.getState().currentRoute).toBe(state.currentRoute);
+  });
+
+  test('range back button restores the URL and whole drive bounds', async () => {
+    const { history, store } = await renderApp(`/${FIRST}/${LOG}`);
+    act(() => history.push(`/${FIRST}/${LOG}/10/20`));
+    await waitFor(() => expect(store.getState().zoom.start).toBe(10000));
+    fireEvent.click(screen.getByRole('button', { name: 'Go Back' }));
+    await waitFor(() => expect(history.location.pathname).toBe(`/${FIRST}/${LOG}`));
+    expect(store.getState().zoom).toMatchObject({ start: 0, end: 60000 });
+  });
+
+  test('settings bookmark opens for a device after startup data loads', async () => {
+    const { history } = await renderApp(`/${FIRST}?modal=settings&device=${FIRST}`);
+    expect(await screen.findByText('Device settings')).toBeVisible();
+    expect(screen.getByLabelText('Device name')).toHaveValue('Zulu');
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(history.location.search).toBe(''));
+  });
+
   test('drive selection, timeline range, back, and close preserve exact URLs', async () => {
     const { history } = await renderApp(`/${FIRST}`, { selected: FIRST });
     fireEvent.click(await screen.findByText('Mock recent route start'));
